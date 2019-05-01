@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sqlite3
+import argparse
+import sys
+import getpass
+
+sqlite3DB = 'pass.db'
+
+
+def argparser(**kwargs):
+    function_map = kwargs['function_map']
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('action', choices=function_map.keys())
+    parser.add_argument('--name', metavar='name', type=str)
+    parser.add_argument('--account', metavar='account', type=str)
+    args = parser.parse_args()
+    return args
+
+
+def getConn(db):
+    conn = sqlite3.connect(db)
+    return conn
+
+
+def get(conn, **kwargs):
+    get_string = ''
+    name = kwargs["name"]
+    account = kwargs["account"]
+    c = conn.cursor()
+    if name:
+        get_string = "SELECT * FROM project WHERE name LIKE '%{0}%'".format(name)
+    elif account:
+        get_string = "SELECT * FROM project WHERE account LIKE '%{0}%'".format(account)
+    else:
+        print("请提供相关查询关键字！")
+    c.execute(get_string)
+    query_set = c.fetchall()
+    if query_set:
+        for query in query_set:
+            print("-------------------\n")
+            for s in zip(('name', 'url', 'account', 'password'), query):
+                print("{0}: {1}".format(s[0].encode('utf-8'), s[1].encode('utf-8')))
+        print('\n-------------------')
+    return
+
+
+def set(conn, **kwargs):
+    name, url, account, password, password_confirm = "", "", "", "", ""
+    while not name:
+        name = raw_input("请输入项目名称：")
+        if not name:
+            print("name不能为空！")
+    url = raw_input("请输入项目地址：")
+    while not account:
+        account = raw_input("请输入账户名称：")
+        if not account:
+            print("account不能为空！")
+    while not password or not password_confirm:
+        password = getpass.getpass("请输入密码：")
+        password_confirm = getpass.getpass("请再次输入密码：")
+        if not password or not password_confirm:
+            print("两次密码输入均不能为空！")
+    if not password == password_confirm:
+        print("两次输入登密码不一致，系统退出！")
+        sys.exit(-1)
+    set_string = "INSERT INTO project VALUES ('{0}', '{1}', '{2}', '{3}')".format(name, url, account, password)
+    try:
+        c = conn.cursor()
+        c.execute(set_string)
+        conn.commit()
+        print("数据库写入成功")
+    except:
+        print("数据库写入失败！")
+        sys.exit(-2)
+
+
+def main():
+    function_map = {'get': get, 'set': set}
+    args = argparser(function_map=function_map)
+    conn = getConn(sqlite3DB)
+    action = function_map[args.action]
+    action(conn, name=args.name, account=args.account)
+    # c.execute('''CREATE TABLE project(name text, url text, account text, password)''')
+    # conn.commit()
+    conn.close()
+
+
+if __name__ == "__main__":
+    main()
